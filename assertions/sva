@@ -1,0 +1,82 @@
+// assertions 
+  property p_read_valid;
+  @(posedge clk)
+  disable iff (rst)
+  rd_en && !empty |=> rd_valid;
+endproperty
+  // if valid rd_data must be stable
+assert property (p_read_valid);  
+  
+  property p_no_write_on_full;
+  @(posedge clk)
+  disable iff (rst)
+  wr_en && full |-> 0;
+endproperty
+
+assert property (p_no_write_on_full);
+  
+  
+  //underflow
+  
+  property p_no_underflow;
+  @(posedge clk)
+  disable iff (rst)
+  rd_en && empty |=> !rd_valid;
+endproperty
+
+assert property (p_no_underflow);
+  
+ 
+
+  
+  
+  // high fifo priority
+  property p_high_priority;
+  @(posedge clk)
+  disable iff (rst)
+  (rd_en && !high_empty) |-> (high_rd);
+endproperty
+
+assert property (p_high_priority);
+  
+  //medium  priority
+  
+  property p_med_priority;
+  @(posedge clk)
+  disable iff (rst)
+  (rd_en && high_empty && !med_empty) |-> med_rd;
+endproperty
+
+assert property (p_med_priority);
+  
+  //low priority
+  property p_low_priority;
+  @(posedge clk)
+  disable iff (rst)
+  (rd_en && high_empty && med_empty && !low_empty) |-> low_rd;
+endproperty
+
+assert property (p_low_priority);
+  
+  property p_starvation_prevention;
+  @(posedge clk)
+  disable iff (rst)
+  (high_served_count >= MAX_HIGH_CONSECUTIVE && !med_empty)
+  |-> med_rd;
+endproperty
+
+assert property (p_starvation_prevention);
+  
+  property p_reset_empty;
+  @(posedge clk)
+    rst |=>  empty;
+endproperty
+
+assert property (p_reset_empty);
+  
+  property p_no_valid_during_reset;
+  @(posedge clk)
+  rst |-> !rd_valid;
+endproperty
+
+assert property (p_no_valid_during_reset);
