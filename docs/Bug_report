@@ -1,0 +1,66 @@
+BUG FIFO-001
+Title: rd_valid intermittently not asserted on HIGH priority reads
+Severity: Critical
+Found By: high_burst_test, starvation_test, full_fifo_test, mixed_test
+Design File: design.sv line 285 (high_rd assertion)
+Description:
+When rd_en=1 and the HIGH priority queue is non-empty, rd_valid is not asserted on every valid output cycle. The DUT's own internal assertion high_rd at design.sv:285 fires repeatedly confirming the bug location.
+Failing Tests & Error Counts:
+__________________________________________________________________________________________________
+Test                     SCB Errors                     DUT Assertion Fires
+__________________________________________________________________________________________________
+high_burst                   3                                 0
+__________________________________________________________________________________________________
+starvation                   11                                3(at @210, @310, @410) 
+__________________________________________________________________________________________________
+full_fifo                    6                                 1(at @590) 
+__________________________________________________________________________________________________
+mixed                        26                                4 (at @1070, @1310, @1510, @1630)
+__________________________________________________________________________________________________
+
+Evidence from starvation_test:
+__________________________________________________________________________________________________
+design.sv:285 @ 210ns: assertion 'high_rd' FAILED
+design.sv:285 @ 310ns: assertion 'high_rd' FAILED  
+design.sv:285 @ 410ns: assertion 'high_rd' FAILED
+SCB ERROR @ 210: MISMATCH! exp=2870558818 got=450173559
+SCB ERROR @ 230: MISMATCH! exp=752986682 got=611485581
+__________________________________________________________________________________________________
+
+Expected: rd_valid=1 every cycle after rd_en=1 when HIGH queue non-empty
+Actual: rd_valid missing on alternating cycles, data_op advances without rd_valid
+Impact: Consumer logic misses every other HIGH priority read transaction — silent data loss
+Suspected RTL Location: rd_valid generation logic for high priority path, design.sv around line 285
+
+BUG FIFO-002
+Title: rd_valid intermittently not asserted on MEDIUM priority reads
+Severity: Critical
+Found By: mixed_test
+Design File: design.sv line 313 (med_rd assertion)
+Description:
+Same class of bug as FIFO-001 but affecting the MEDIUM priority read path. When high priority queue is empty and rd_en=1 with medium priority items present, rd_valid is intermittently suppressed. DUT's own med_rd assertion at design.sv:313 confirms the location.
+Failing Tests & Error Counts:
+
+__________________________________________________________________________________________________
+Test                        DUT Assertion Fires
+__________________________________________________________________________________________________
+mixed                           3 (at @1050, @1290, @1490, @1970)
+__________________________________________________________________________________________________
+starvation                      Not triggered (MED items never reached due to FIFO-001)
+__________________________________________________________________________________________________
+
+Evidence from mixed_test:
+__________________________________________________________________________________________________
+design.sv:313 @ 1050ns: assertion 'med_rd' FAILED
+design.sv:313 @ 1290ns: assertion 'med_rd' FAILED
+design.sv:313 @ 1490ns: assertion 'med_rd' FAILED
+SCB ERROR @ 1310: MISMATCH! exp=1906473889 got=1653765981
+__________________________________________________________________________________________________
+
+Expected: rd_valid=1 every cycle after rd_en=1 when MED queue non-empty and HIGH queue empty
+Actual: rd_valid suppressed intermittently on medium priority drain path
+Impact: Medium priority data silently lost when system transitions from HIGH to MED drain
+Suspected RTL Location: design.sv around line 313
+Relationship to FIFO-001: Same root cause pattern — likely the same fix will resolve both. Low priority path (low_rd) not yet confirmed buggy but should be inspected.
+
+
